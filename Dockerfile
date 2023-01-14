@@ -18,7 +18,8 @@ COPY . .
 RUN cargo build --release -p sqld
 
 # runtime
-FROM debian:bullseye-slim
+FROM frolvlad/alpine-glibc
+RUN apk add bash
 COPY --from=builder /sqld/target/release/sqld /bin/sqld
 COPY docker-entrypoint.sh /usr/local/bin
 ENTRYPOINT ["docker-entrypoint.sh"]
