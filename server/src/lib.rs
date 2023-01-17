@@ -47,6 +47,9 @@ pub struct Config {
     pub mwal_addr: Option<String>,
     pub writer_rpc_addr: Option<String>,
     pub rpc_server_addr: Option<SocketAddr>,
+    pub rpc_server_tls: bool,
+    pub rpc_server_cert: Option<PathBuf>,
+    pub rpc_server_key: Option<PathBuf>,
 }
 
 async fn run_service<S>(service: S, config: Config) -> Result<()>
@@ -129,7 +132,14 @@ pub async fn run_server(config: Config) -> Result<()> {
             };
             let service = DbFactoryService::new(db_factory.clone());
             if let Some(addr) = config.rpc_server_addr {
-                tokio::spawn(run_rpc_server(addr, db_factory, logger_clone));
+                tokio::spawn(run_rpc_server(
+                    addr,
+                    config.rpc_server_tls,
+                    config.rpc_server_cert.clone(),
+                    config.rpc_server_key.clone(),
+                    db_factory,
+                    logger_clone,
+                ));
             }
             run_service(service, config).await?;
         }
