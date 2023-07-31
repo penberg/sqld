@@ -66,10 +66,10 @@ impl WriteProxyDbFactory {
 impl DbFactory for WriteProxyDbFactory {
     type Db = WriteProxyDatabase;
     async fn create(&self, namespace: &str) -> Result<Self::Db> {
-        todo!();
         let db = WriteProxyDatabase::new(
             self.client.clone(),
             self.db_path.clone(),
+            namespace.to_string(),
             self.extensions.clone(),
             self.stats.clone(),
             self.config_store.clone(),
@@ -146,12 +146,15 @@ impl WriteProxyDatabase {
     async fn new(
         write_proxy: ProxyClient<Channel>,
         path: PathBuf,
+        namespace: String,
         extensions: Vec<PathBuf>,
         stats: Stats,
         config_store: Arc<DatabaseConfigStore>,
         applied_frame_no_receiver: watch::Receiver<FrameNo>,
         builder_config: QueryBuilderConfig,
     ) -> Result<Self> {
+        let path: PathBuf = format!("{}{}", path.display(), namespace).into();
+        std::fs::create_dir_all(&path).unwrap();
         let read_db = LibSqlDb::new(
             path,
             extensions,
