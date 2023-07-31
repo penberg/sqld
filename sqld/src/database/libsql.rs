@@ -47,6 +47,7 @@ where
 {
     pub async fn new<F>(
         db_path: PathBuf,
+        namespace: &str,
         hook: &'static WalMethodsHook<W>,
         ctx_builder: F,
         stats: Stats,
@@ -68,18 +69,18 @@ where
             _db: None,
         };
 
-        let db = this.try_create_db().await?;
+        let db = this.try_create_db(namespace).await?;
         this._db = Some(db);
 
         Ok(this)
     }
 
     /// Tries to create a database, retrying if the database is busy.
-    async fn try_create_db(&self) -> Result<LibSqlDb> {
+    async fn try_create_db(&self, namespace: &str) -> Result<LibSqlDb> {
         // try 100 times to acquire initial db connection.
         let mut retries = 0;
         loop {
-            match self.create_database().await {
+            match self.create_database(namespace).await {
                 Ok(conn) => return Ok(conn),
                 Err(
                     err @ Error::RusqliteError(rusqlite::Error::SqliteFailure(
@@ -103,9 +104,11 @@ where
         }
     }
 
-    async fn create_database(&self) -> Result<LibSqlDb> {
+    async fn create_database(&self, namespace: &str) -> Result<LibSqlDb> {
+        let path: PathBuf = format!("{}{}", self.db_path.display(), namespace).into();
+        std::fs::create_dir_all(&path).unwrap();
         LibSqlDb::new(
-            self.db_path.clone(),
+            path,
             self.extensions.clone(),
             self.hook,
             (self.ctx_builder)(),
@@ -127,8 +130,8 @@ where
 {
     type Db = LibSqlDb;
 
-    async fn create(&self) -> Result<Self::Db, Error> {
-        self.create_database().await
+    async fn create(&self, namespace: &str) -> Result<Self::Db, Error> {
+        self.create_database(namespace).await
     }
 }
 

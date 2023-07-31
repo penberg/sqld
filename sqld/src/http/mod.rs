@@ -120,6 +120,7 @@ fn parse_payload(data: &[u8]) -> Result<HttpQuery, Response<Body>> {
 async fn handle_query<D: Database>(
     mut req: Request<Body>,
     auth: Authenticated,
+    namespace: String,
     db_factory: Arc<dyn DbFactory<Db = D>>,
 ) -> anyhow::Result<Response<Body>> {
     let bytes = to_bytes(req.body_mut()).await?;
@@ -133,7 +134,7 @@ async fn handle_query<D: Database>(
         Err(e) => return Ok(error(&e.to_string(), StatusCode::BAD_REQUEST)),
     };
 
-    let db = db_factory.create().await?;
+    let db = db_factory.create(&namespace).await?;
 
     let builder = JsonHttpPayloadBuilder::new();
     match db.execute_batch_or_rollback(batch, auth, builder).await {
@@ -177,6 +178,12 @@ async fn handle_upgrade(
     }
 }
 
+fn split_url_path(path: &str) -> (&str, &str) {
+    let idx = path[1..].find('/').unwrap();
+    let first = &path[0..idx+1];
+    (first, path.trim_start_matches(first))
+}
+
 async fn handle_request<D: Database>(
     auth: Arc<Auth>,
     req: Request<Body>,
@@ -186,11 +193,13 @@ async fn handle_request<D: Database>(
     enable_console: bool,
     stats: Stats,
 ) -> anyhow::Result<Response<Body>> {
+    let (namespace, path) = split_url_path(req.uri().path());
+    let namespace = namespace.to_string();
     if hyper_tungstenite::is_upgrade_request(&req) {
         return Ok(handle_upgrade(&upgrade_tx, req).await);
     }
 
-    if req.method() == Method::GET && req.uri().path() == "/health" {
+    if req.method() == Method::GET && path == "/health" {
         return Ok(handle_health());
     }
     let auth_header = req.headers().get(hyper::header::AUTHORIZATION);
@@ -204,8 +213,8 @@ async fn handle_request<D: Database>(
         }
     };
 
-    match (req.method(), req.uri().path()) {
-        (&Method::POST, "/") => handle_query(req, auth, db_factory.clone()).await,
+    match (req.method(), path) {
+        (&Method::POST, "/") => handle_query(req, auth, namespace, db_factory.clone()).await,
         (&Method::GET, "/version") => Ok(handle_version()),
         (&Method::GET, "/console") if enable_console => show_console().await,
         (&Method::GET, "/v1/stats") => Ok(stats::handle_stats(&stats)),

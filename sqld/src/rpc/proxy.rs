@@ -446,12 +446,13 @@ impl<D: Database> Proxy for ProxyService<D> {
             }
             None => Authenticated::Anonymous,
         };
+        let namespace = "/foo"; // TODO: get namespace from request
         let lock = self.clients.upgradable_read().await;
         let db = match lock.get(&client_id) {
             Some(db) => db.clone(),
             None => {
                 tracing::debug!("connected: {client_id}");
-                match self.factory.create().await {
+                match self.factory.create(namespace).await {
                     Ok(db) => {
                         let db = Arc::new(db);
                         let mut lock = RwLockUpgradableReadGuard::upgrade(lock).await;

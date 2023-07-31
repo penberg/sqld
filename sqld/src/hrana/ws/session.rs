@@ -162,9 +162,10 @@ pub(super) async fn handle_request<DB: Database>(
             let mut stream_hnd = stream_spawn(join_set, Stream { db: None });
             let db_factory = server.db_factory.clone();
 
+            let namespace = "/foo"; // TODO: get namespace from request
             stream_respond!(&mut stream_hnd, async move |stream| {
                 let db = db_factory
-                    .create()
+                    .create(namespace)
                     .await
                     .context("Could not create a database connection")?;
                 stream.db = Some(db);

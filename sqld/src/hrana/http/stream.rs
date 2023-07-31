@@ -145,9 +145,10 @@ pub async fn acquire<'srv, D: Database>(
             stream
         }
         None => {
+            let namespace = "/foo"; // TODO: get namespace from request
             let db = server
                 .db_factory
-                .create()
+                .create(namespace)
                 .await
                 .context("Could not create a database connection")?;
 

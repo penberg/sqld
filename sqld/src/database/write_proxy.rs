@@ -65,7 +65,8 @@ impl WriteProxyDbFactory {
 #[async_trait::async_trait]
 impl DbFactory for WriteProxyDbFactory {
     type Db = WriteProxyDatabase;
-    async fn create(&self) -> Result<Self::Db> {
+    async fn create(&self, namespace: &str) -> Result<Self::Db> {
+        todo!();
         let db = WriteProxyDatabase::new(
             self.client.clone(),
             self.db_path.clone(),

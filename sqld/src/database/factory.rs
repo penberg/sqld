@@ -13,7 +13,7 @@ use crate::{
 pub trait DbFactory: Send + Sync + 'static {
     type Db: Database;
 
-    async fn create(&self) -> Result<Self::Db, Error>;
+    async fn create(&self, namespace: &str) -> Result<Self::Db, Error>;
 
     fn throttled(self, conccurency: usize, timeout: Option<Duration>) -> ThrottledDbFactory<Self>
     where
@@ -26,14 +26,14 @@ pub trait DbFactory: Send + Sync + 'static {
 #[async_trait::async_trait]
 impl<F, DB, Fut> DbFactory for F
 where
-    F: Fn() -> Fut + Send + Sync + 'static,
+    F: Fn(&str) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = Result<DB, Error>> + Send,
     DB: Database + Sync + Send + 'static,
 {
     type Db = DB;
 
-    async fn create(&self) -> Result<Self::Db, Error> {
-        let db = (self)().await?;
+    async fn create(&self, namespace: &str) -> Result<Self::Db, Error> {
+        let db = (self)(namespace).await?;
         Ok(db)
     }
 }
@@ -59,14 +59,14 @@ impl<F> ThrottledDbFactory<F> {
 impl<F: DbFactory> DbFactory for ThrottledDbFactory<F> {
     type Db = TrackedDb<F::Db>;
 
-    async fn create(&self) -> Result<Self::Db, Error> {
+    async fn create(&self, namespace: &str) -> Result<Self::Db, Error> {
         let fut = self.semaphore.clone().acquire_owned();
         let permit = match self.timeout {
             Some(t) => timeout(t, fut).await.map_err(|_| Error::DbCreateTimeout)?,
             None => fut.await,
         }
         .expect("semaphore closed");
-        let inner = self.factory.create().await?;
+        let inner = self.factory.create(namespace).await?;
         Ok(TrackedDb { permit, inner })
     }
 }
@@ -127,13 +127,13 @@ mod test {
 
         let mut conns = Vec::with_capacity(10);
         for _ in 0..10 {
-            conns.push(factory.create().await.unwrap())
+            conns.push(factory.create("/hello").await.unwrap())
         }
 
-        assert!(factory.create().await.is_err());
+        assert!(factory.create("/hello").await.is_err());
 
         drop(conns);
 
-        assert!(factory.create().await.is_ok());
+        assert!(factory.create("/hello").await.is_ok());
     }
 }

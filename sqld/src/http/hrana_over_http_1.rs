@@ -103,8 +103,9 @@ where
         let req_body = serde_json::from_slice(&req_body)
             .map_err(|e| hrana::ProtocolError::Deserialize { source: e })?;
 
+        let namespace = "/foo"; // TODO: get namespace from request
         let db = db_factory
-            .create()
+            .create(namespace)
             .await
             .context("Could not create a database connection")?;
         let resp_body = f(db, req_body).await?;

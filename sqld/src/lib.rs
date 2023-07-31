@@ -474,6 +474,7 @@ async fn start_primary(
 
     let db_factory: Arc<_> = LibSqlDbFactory::new(
         config.db_path.clone(),
+        "/main", // TODO
         &REPLICATION_METHODS,
         {
             let logger = logger.clone();
